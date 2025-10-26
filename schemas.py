@@ -1,48 +1,79 @@
-"""
-Database Schemas
+from typing import List, Optional, Annotated
+from pydantic import BaseModel, Field, StringConstraints
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+# Reusable constrained types (Pydantic v2 style)
+AyushId = Annotated[str, StringConstraints(min_length=6, max_length=32, pattern=r"^[A-Z0-9-]{6,32}$")]
+RoleType = Annotated[str, StringConstraints(pattern=r"^(patient|practitioner)$")]
+DocHash = Annotated[str, StringConstraints(min_length=32, max_length=128)]
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
-"""
 
-from pydantic import BaseModel, Field
-from typing import Optional
+class PractitionerVerifyRequest(BaseModel):
+    ayush_id: AyushId
+    name: Annotated[str, StringConstraints(min_length=2, max_length=80)]
+    specialization: Optional[str] = None
+    document_hash: DocHash = Field(
+        ..., description="SHA-256 or similar hash of verification document"
+    )
 
-# Example schemas (replace with your own):
 
-class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+class PractitionerResponse(BaseModel):
+    practitioner_id: str
+    verified: bool
+    credential_hash: str
+    tx_hash: str
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+class ChatMessageCreate(BaseModel):
+    patient_id: str
+    practitioner_id: str
+    role: RoleType
+    content: Optional[str] = None
+    attachments: Optional[List[str]] = []
+    language: Optional[str] = "auto"
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+
+class ChatMessageResponse(BaseModel):
+    id: str = Field(..., alias="_id")
+    patient_id: str
+    practitioner_id: str
+    role: str
+    content: Optional[str] = None
+    attachments: Optional[List[str]] = []
+    language: Optional[str] = "auto"
+    created_at: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+
+
+class ChatQuery(BaseModel):
+    patient_id: str
+    practitioner_id: str
+    limit: int = 50
+
+
+class DietPlanRequest(BaseModel):
+    name: Optional[str] = None
+    age: Optional[int] = None
+    location: Optional[str] = None
+    prakriti: Optional[str] = None
+    lifestyle: Optional[str] = None
+    preferences: Optional[str] = None
+
+
+class DietPlan(BaseModel):
+    summary: str
+    diet: List[str]
+    lifestyle: List[str]
+    adjustments: str
+
+
+class ConsultationSessionCreate(BaseModel):
+    patient_id: str
+    practitioner_id: str
+
+
+class ConsultationSessionResponse(BaseModel):
+    session_id: str
+    token: str
+    expires_in: int
